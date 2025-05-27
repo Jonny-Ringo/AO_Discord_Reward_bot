@@ -134,18 +134,21 @@ const ASSET_CONFIG = {
         name: 'Teraflops',
         amount: '1',
         token: 'Gold',
+        tokenDisplayName: 'The Golden Floppy Disk', // Add this
         assetId: GOLD_ASSET_ID
     },
     '1293319793981526077': { // Gigaflops
         name: 'Gigaflops',
         amount: '1',
         token: 'Silver',
+        tokenDisplayName: 'The Silver Floppy Disk', // Add this
         assetId: SILVER_ASSET_ID
     },
     '1293319628566560849': { // Megaflops
         name: 'Megaflops',
         amount: '1',
         token: 'Bronze',
+        tokenDisplayName: 'The Bronze Floppy Disk', // Add this
         assetId: BRONZE_ASSET_ID
     }
 };
@@ -231,7 +234,7 @@ function updateRewardStatus(txId, status) {
     });
 }
 
-// Enhanced profile lookup endpoint with proper error handling
+// Enhanced profile lookup endpoint with proper error handling (WORKING VERSION)
 app.get('/api/lookup-profile/:address', async (req, res) => {
     const { address } = req.params;
     
@@ -254,11 +257,11 @@ app.get('/api/lookup-profile/:address', async (req, res) => {
         console.log(`🔍 Looking up Bazar profile for address: ${address}`);
         
         if (!permaweb) {
-            console.log('❌ Permaweb not initialized, falling back to manual entry');
+            console.log('❌ Permaweb not initialized, profile lookup unavailable');
             return res.json({
                 success: false,
-                message: 'Permaweb libs not available - please enter profile ID manually',
-                requiresManualEntry: true,
+                message: 'Profile lookup service unavailable. Please ensure you have a Bazar profile.',
+                requiresProfile: true, // Changed from requiresManualEntry
                 debug: 'permaweb_not_initialized'
             });
         }
@@ -269,8 +272,8 @@ app.get('/api/lookup-profile/:address', async (req, res) => {
             console.log('📋 Available methods:', Object.getOwnPropertyNames(permaweb).filter(name => typeof permaweb[name] === 'function'));
             return res.json({
                 success: false,
-                message: 'Profile lookup method not available',
-                requiresManualEntry: true,
+                message: 'Profile lookup method not available. Please ensure you have a Bazar profile.',
+                requiresProfile: true, // Changed from requiresManualEntry
                 debug: 'method_not_available'
             });
         }
@@ -305,8 +308,8 @@ app.get('/api/lookup-profile/:address', async (req, res) => {
             console.log(`❌ No valid profile found - profile:`, profile);
             res.json({
                 success: false,
-                message: 'No Bazar profile found for this wallet address',
-                requiresManualEntry: true,
+                message: 'No Bazar profile found for this wallet address. Please create one at bazar.arweave.dev',
+                requiresProfile: true, // Changed from requiresManualEntry
                 debug: {
                     profileExists: !!profile,
                     hasId: !!(profile && profile.id),
@@ -323,8 +326,8 @@ app.get('/api/lookup-profile/:address', async (req, res) => {
         
         res.status(500).json({
             success: false,
-            message: 'Profile lookup failed: ' + error.message,
-            requiresManualEntry: true,
+            message: 'Profile lookup failed: ' + error.message + '. Please ensure you have a Bazar profile.',
+            requiresProfile: true, // Changed from requiresManualEntry
             debug: {
                 errorType: error.constructor.name,
                 errorMessage: error.message
@@ -525,12 +528,24 @@ app.post('/api/verify-and-reward', async (req, res) => {
         // Check if reward already claimed (now includes Bazar profile)
         const existingReward = await checkExistingReward(discordUserId, eligibleRoleId, bazarProfileId);
         if (existingReward) {
+            console.log('⚠️  User already claimed this reward:', existingReward);
             return res.json({
                 success: false,
-                message: `Reward for ${rewardConfig.name} role already claimed`,
-                alreadyClaimed: true
+                message: `You have already claimed your ${rewardConfig.name} role reward! Each role reward can only be claimed once.`,
+                alreadyClaimed: true,
+                errorType: 'ALREADY_CLAIMED',
+                claimDate: existingReward.created_at,
+                transactionId: existingReward.tx_id,
+                rewardDetails: {
+                    roleName: rewardConfig.name,           // Should be "Teraflops"
+                    token: rewardConfig.token,             // Should be "Gold" 
+                    tokenDisplayName: rewardConfig.tokenDisplayName, // Should be "The Golden Floppy Disk"
+                    amount: rewardConfig.amount,           // Should be "1"
+                    status: existingReward.status || 'confirmed'
+                }
             });
         }
+        
         console.log('🔍 DETAILED DEBUG:');
         console.log('   Eligible Role ID:', eligibleRoleId);
         console.log('   Eligible Role ID Type:', typeof eligibleRoleId);
@@ -603,8 +618,6 @@ app.post('/api/verify-and-reward', async (req, res) => {
         if (saveError.message && saveError.message.includes('UNIQUE constraint failed')) {
             console.log('🔄 User attempted to claim reward they already have');
             
-            // The transfer already went through, but they already had this reward
-            // We should probably check this BEFORE sending the transfer, but for now:
             return res.json({
                 success: false,
                 message: `You have already claimed your ${rewardConfig.name} role reward! Each role reward can only be claimed once.`,
@@ -613,6 +626,7 @@ app.post('/api/verify-and-reward', async (req, res) => {
                 rewardDetails: {
                     roleName: rewardConfig.name,
                     token: rewardConfig.token,
+                    tokenDisplayName: rewardConfig.tokenDisplayName,
                     amount: rewardConfig.amount
                 }
             });
