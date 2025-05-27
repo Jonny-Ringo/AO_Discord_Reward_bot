@@ -12,18 +12,21 @@ const CONFIG = {
             name: 'Teraflops', 
             amount: '1', 
             token: 'Gold',
+            tokenDisplayName: 'The Golden Floppy Disk',
             description: 'Exclusive Gold Asset for Teraflops members'
         },
         '1293319793981526077': { 
             name: 'Gigaflops', 
             amount: '1', 
             token: 'Silver',
+            tokenDisplayName: 'The Silver Floppy Disk',
             description: 'Silver Asset for Gigaflops members'
         },
         '1293319628566560849': { 
             name: 'Megaflops', 
             amount: '1', 
             token: 'Bronze',
+            tokenDisplayName: 'The Bronze Floppy Disk',
             description: 'Bronze Asset for Megaflops members'
         }
     }
@@ -136,29 +139,38 @@ async function connectWallet() {
             console.log('📡 Looking up Bazar profile via backend...');
             
             const backendResponse = await fetch(`${CONFIG.apiBaseUrl}/lookup-profile/${address}`);
-            const backendData = await backendResponse.json();
             
-            if (backendData.success && backendData.profile && backendData.profile.id) {
-                console.log('✅ Found profile via backend:', backendData.profile);
-                userState.bazarProfile = backendData.profile;
-                showBazarProfileInfo(backendData.profile);
-                showStatus('✅ Wallet connected and Bazar profile found!', 'success');
-                nextStep();
-            } else {
-                throw new Error(backendData.message || 'No Bazar profile found for this wallet address');
+            if (backendResponse.ok) {
+                const backendData = await backendResponse.json();
+                
+                if (backendData.success && backendData.profile && backendData.profile.id) {
+                    console.log('✅ Found profile via backend:', backendData.profile);
+                    userState.bazarProfile = backendData.profile;
+                    showBazarProfileInfo(backendData.profile);
+                    showStatus('✅ Wallet connected and Bazar profile found!', 'success');
+                    nextStep();
+                    return;
+                } else if (backendData.requiresProfile) {
+                    // Backend specifically says profile is required
+                    console.log('📝 Backend says profile is required');
+                    showStatus('No Bazar profile found. You must create one to receive rewards.', 'error');
+                    showBazarProfileHelp();
+                    return;
+                }
             }
+            
+            // If we get here, something went wrong
+            throw new Error('Profile lookup service unavailable. Please ensure you have a Bazar profile.');
             
         } catch (profileError) {
             console.error('❌ Bazar profile lookup error:', profileError);
             
-            // Show detailed error and manual override option
-            showStatus('❌ No Bazar profile found for this wallet address.', 'error');
+            // No manual entry - just fail and show help
+            showStatus('❌ No Bazar profile found for this wallet address. You must create a Bazar profile to receive rewards.', 'error');
             showBazarProfileHelp();
             
-            // Allow manual profile ID entry as fallback
-            setTimeout(() => {
-                showManualProfileInput();
-            }, 2000);
+            // Do not proceed - user must create profile and restart
+            userState.bazarProfile = null;
         }
         
     } catch (error) {
@@ -169,61 +181,6 @@ async function connectWallet() {
         }
         console.error('Wallet connection error:', error);
     }
-}
-
-// Show manual profile input option
-function showManualProfileInput() {
-    const manualInputHtml = `
-        <div id="manualProfileInput" style="margin-top: 1rem; padding: 1rem; background: #2a2a2a; border-radius: 8px;">
-            <h4 style="color: #5865f2; margin-bottom: 0.5rem;">Manual Profile Entry</h4>
-            <p style="font-size: 0.9rem; margin-bottom: 1rem;">
-                If you have a Bazar profile but it wasn't found automatically, you can enter your profile ID manually:
-            </p>
-            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-                <input 
-                    type="text" 
-                    id="manualProfileId" 
-                    placeholder="Enter your Bazar profile ID (43 characters)" 
-                    style="flex: 1; padding: 0.5rem; border-radius: 4px; border: 1px solid #555; background: #1a1a1a; color: white;"
-                />
-                <button 
-                    id="submitManualProfile" 
-                    style="padding: 0.5rem 1rem; border-radius: 4px; border: none; background: #5865f2; color: white; cursor: pointer;"
-                >
-                    Use This ID
-                </button>
-            </div>
-            <p style="font-size: 0.8rem; color: #888;">
-                Your profile ID should be 43 characters long and start with letters/numbers.
-            </p>
-        </div>
-    `;
-    
-    statusDiv.innerHTML += manualInputHtml;
-    
-    // Add event listener for manual submission
-    document.getElementById('submitManualProfile').addEventListener('click', () => {
-        const profileId = document.getElementById('manualProfileId').value.trim();
-        
-        if (profileId.length === 43) {
-            userState.bazarProfile = { 
-                id: profileId, 
-                username: 'Manual Entry',
-                displayName: 'Manual Entry',
-                walletAddress: userState.wallet.address
-            };
-            
-            showBazarProfileInfo(userState.bazarProfile);
-            showStatus('✅ Manual profile ID accepted! Proceeding...', 'success');
-            
-            // Remove manual input section
-            document.getElementById('manualProfileInput').remove();
-            
-            nextStep();
-        } else {
-            showStatus('❌ Invalid profile ID. Should be 43 characters long.', 'error');
-        }
-    });
 }
 
 // Verify roles and claim reward
@@ -265,18 +222,46 @@ async function verifyRolesAndClaim() {
 
         const result = await response.json();
         console.log('📋 Verification result:', result);
+        console.log('📋 Reward details received:', result.rewardDetails);
 
         if (result.success) {
             showStatus('🎉 Verification successful! Asset transfer completed!', 'success');
             showRewardSuccess(result.reward);
             completeStep();
         } else {
-            if (result.alreadyClaimed) {
-                showStatus('⚠️ ' + result.message, 'error');
-            } else if (result.message.includes('Bazar profile')) {
+            // Handle specific error types with better messaging
+            if (result.alreadyClaimed || result.errorType === 'ALREADY_CLAIMED') {
+                const claimDate = result.claimDate ? new Date(result.claimDate).toLocaleDateString() : 'previously';
+                const roleName = result.rewardDetails?.roleName || 'your role';
+                const tokenDisplayName = result.rewardDetails?.tokenDisplayName || result.rewardDetails?.token || 'reward';
+                const txId = result.transactionId;
+                
+                let message = `🎯 You've already claimed your ${roleName} role reward (${tokenDisplayName})!`;
+                if (claimDate !== 'previously') {
+                    message += `\n\nClaimed on: ${claimDate}`;
+                }
+                if (txId) {
+                    message += `\nTransaction: ${txId.substring(0, 12)}...`;
+                }
+                message += '\n\nEach role reward can only be claimed once.';
+                
+                showStatus(message, 'error');
+                showAlreadyClaimedInfo(result);
+                
+            } else if (result.errorType === 'DUPLICATE_CLAIM') {
+                const roleName = result.rewardDetails?.roleName || 'your role';
+                const tokenDisplayName = result.rewardDetails?.tokenDisplayName || result.rewardDetails?.token || 'reward';
+                showStatus(`⚠️ You've already claimed your ${roleName} reward (${tokenDisplayName})! Each role reward can only be claimed once.`, 'error');
+                
+            } else if (result.errorType === 'DATABASE_ERROR') {
+                showStatus('❌ Database error occurred. Please try again later or contact support.', 'error');
+                
+            } else if (result.message && result.message.includes('Bazar profile')) {
                 showStatus(`❌ ${result.message}`, 'error');
                 showBazarProfileHelp();
+                
             } else {
+                // Generic error
                 showStatus(result.message || 'Verification failed', 'error');
             }
         }
@@ -349,6 +334,34 @@ function showRewardSuccess(reward) {
     `;
 }
 
+function showAlreadyClaimedInfo(result) {
+    if (!result.rewardDetails) return;
+    
+    const tokenDisplayName = result.rewardDetails.tokenDisplayName || result.rewardDetails.token || 'Unknown Reward';
+    const roleName = result.rewardDetails.roleName || 'Unknown Role';
+    const amount = result.rewardDetails.amount || '1';
+    
+    const claimedInfoHtml = `
+        <div style="margin-top: 1rem; padding: 1.5rem; background: linear-gradient(135deg, #2a1a1a, #1a1a2a); border-radius: 8px; border: 1px solid #ff6b35;">
+            <h4 style="color: #ff6b35; margin-bottom: 1rem; text-align: center;">🎯 Reward Already Claimed</h4>
+            <div style="text-align: left; color: #ccc;">
+                <p><strong>Role:</strong> ${roleName}</p>
+                <p><strong>Reward:</strong> ${amount} ${tokenDisplayName}</p>
+                ${result.claimDate ? `<p><strong>Claimed:</strong> ${new Date(result.claimDate).toLocaleDateString()}</p>` : ''}
+                ${result.transactionId ? `<p><strong>Transaction:</strong> <a href="https://www.ao.link/#/message/${result.transactionId}" target="_blank" style="color: #5865f2;">${result.transactionId.substring(0, 12)}...${result.transactionId.substring(result.transactionId.length - 8)}</a></p>` : ''}
+                <p><strong>Status:</strong> ${result.rewardDetails.status || 'Confirmed'}</p>
+            </div>
+            <div style="text-align: center; margin-top: 1rem; padding: 1rem; background: rgba(255, 107, 53, 0.1); border-radius: 6px;">
+                <p style="font-size: 0.9rem; color: #ff6b35; margin: 0;">
+                    💡 <strong>Each eligible role reward can only be claimed once.</strong>
+                </p>
+            </div>
+        </div>
+    `;
+    
+    statusDiv.innerHTML += claimedInfoHtml;
+}
+
 function showBazarProfileHelp() {
     const helpHtml = `
         <div style="margin-top: 1rem; padding: 1rem; background: #2a2a2a; border-radius: 8px; text-align: left;">
@@ -356,15 +369,22 @@ function showBazarProfileHelp() {
             <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">
                 To receive AO assets, you need a Bazar profile linked to your wallet address.
             </p>
-            <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">
-                <strong>How to create one:</strong>
-            </p>
-            <ol style="font-size: 0.9rem; margin-left: 1rem;">
-                <li>Visit <a href="https://bazar.arweave.dev" target="_blank" style="color: #5865f2;">bazar.arweave.dev</a></li>
-                <li>Connect the same wallet you used here</li>
-                <li>Create your profile</li>
-                <li>Return here and try claiming again</li>
-            </ol>
+            
+            <div style="margin: 1rem 0; padding: 1rem; background: #1a1a1a; border-radius: 6px;">
+                <strong style="color: #10b981;">How to create a Bazar profile:</strong>
+                <ol style="font-size: 0.9rem; margin: 0.5rem 0 0 1rem;">
+                    <li>Visit <a href="https://bazar.arweave.dev" target="_blank" style="color: #5865f2;">bazar.arweave.dev</a></li>
+                    <li>Connect the same wallet you used here</li>
+                    <li>Create your profile with username and details</li>
+                    <li><strong>Refresh this page and try connecting your wallet again</strong></li>
+                </ol>
+            </div>
+            
+            <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 107, 53, 0.1); border-radius: 6px; border-left: 4px solid #ff6b35;">
+                <p style="font-size: 0.9rem; color: #ff6b35; margin: 0;">
+                    <strong>⚠️ Important:</strong> Your Bazar profile must be created with the same wallet address you're using here. Once created, it should be automatically detected.
+                </p>
+            </div>
         </div>
     `;
     
