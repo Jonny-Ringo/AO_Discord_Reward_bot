@@ -1,0 +1,31 @@
+{
+  "name": "discord-role-verifier-backend",
+  "version": "1.0.0",
+  "description": "Backend for Discord role verification and AO rewards",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^4.21.2",
+    "@permaweb/aoconnect": "^0.0.85",
+    "@permaweb/libs": "latest",
+    "arweave": "^1.15.1",
+    "sqlite3": "^5.1.7"
+  },
+  "keywords": [
+    "discord",
+    "oauth",
+    "arweave",
+    "verification",
+    "ao",
+    "permaweb"
+  ],
+  "author": "You",
+  "license": "MIT",
+  "type": "commonjs"
+}
