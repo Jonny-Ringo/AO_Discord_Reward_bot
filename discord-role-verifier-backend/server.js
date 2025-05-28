@@ -134,21 +134,21 @@ const ASSET_CONFIG = {
         name: 'Teraflops',
         amount: '1',
         token: 'Gold',
-        tokenDisplayName: 'The Golden Floppy Disk', // Add this
+        tokenDisplayName: 'The Golden Floppy Disk',
         assetId: GOLD_ASSET_ID
     },
     '1293319793981526077': { // Gigaflops
         name: 'Gigaflops',
         amount: '1',
         token: 'Silver',
-        tokenDisplayName: 'The Silver Floppy Disk', // Add this
+        tokenDisplayName: 'The Silver Floppy Disk',
         assetId: SILVER_ASSET_ID
     },
     '1293319628566560849': { // Megaflops
         name: 'Megaflops',
         amount: '1',
         token: 'Bronze',
-        tokenDisplayName: 'The Bronze Floppy Disk', // Add this
+        tokenDisplayName: 'The Bronze Floppy Disk',
         assetId: BRONZE_ASSET_ID
     }
 };
@@ -156,7 +156,7 @@ const ASSET_CONFIG = {
 // Initialize SQLite database
 const db = new sqlite3.Database(DATABASE_PATH);
 
-// Fixed database creation section - replace in your server.js
+// Fixed database creation section
 db.serialize(() => {
     db.run(`
         CREATE TABLE IF NOT EXISTS rewards (
@@ -177,17 +177,15 @@ db.serialize(() => {
     `);
 });
 
-function checkExistingReward(discordUserId, roleId, bazarProfileId) {
+function checkExistingReward(discordUserId, roleId) {
     return new Promise((resolve, reject) => {
         // Check multiple scenarios for existing rewards
         const queries = [
-            // Check by discord user + role (main check)
-            'SELECT * FROM rewards WHERE discord_user_id = ? AND role_id = ?',
-            // Check by discord user + role + profile (more specific)
-            'SELECT * FROM rewards WHERE discord_user_id = ? AND role_id = ? AND bazar_profile_id = ?'
+            // Check by discord user + role
+            'SELECT * FROM rewards WHERE discord_user_id = ? AND role_id = ?'
         ];
         
-        console.log(`🔍 Checking for existing reward: User ${discordUserId}, Role ${roleId}, Profile ${bazarProfileId}`);
+        console.log(`🔍 Checking for existing reward: User ${discordUserId}, Role ${roleId}`);
         
         // Use the more general check (user + role) to prevent any duplicates
         db.get(queries[0], [discordUserId, roleId], (err, row) => {
@@ -234,7 +232,7 @@ function updateRewardStatus(txId, status) {
     });
 }
 
-// Enhanced profile lookup endpoint with proper error handling (WORKING VERSION)
+// Enhanced profile lookup endpoint with proper error handling
 app.get('/api/lookup-profile/:address', async (req, res) => {
     const { address } = req.params;
     
@@ -537,10 +535,10 @@ app.post('/api/verify-and-reward', async (req, res) => {
                 claimDate: existingReward.created_at,
                 transactionId: existingReward.tx_id,
                 rewardDetails: {
-                    roleName: rewardConfig.name,           // Should be "Teraflops"
-                    token: rewardConfig.token,             // Should be "Gold" 
-                    tokenDisplayName: rewardConfig.tokenDisplayName, // Should be "The Golden Floppy Disk"
-                    amount: rewardConfig.amount,           // Should be "1"
+                    roleName: rewardConfig.name,           
+                    token: rewardConfig.token,              
+                    tokenDisplayName: rewardConfig.tokenDisplayName, 
+                    amount: rewardConfig.amount,           
                     status: existingReward.status || 'confirmed'
                 }
             });
@@ -554,7 +552,7 @@ app.post('/api/verify-and-reward', async (req, res) => {
         console.log('   Direct lookup result:', ROLE_REWARDS[eligibleRoleId]);
         console.log('   String lookup result:', ROLE_REWARDS[String(eligibleRoleId)]);
         console.log('   Full ROLE_REWARDS:', JSON.stringify(ROLE_REWARDS, null, 2));
-        // Real AO asset transfer
+        // AO asset transfer
         console.log('🚀 Sending AO asset transfer...');
         const assetId = rewardConfig.assetId;
         
