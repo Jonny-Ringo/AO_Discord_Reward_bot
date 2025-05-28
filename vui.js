@@ -1,7 +1,7 @@
-// vui.js - Updated frontend with Bazar profile support
-// Configuration - WITH YOUR ACTUAL VALUES
+
+// Configuration
 const CONFIG = {
-    discordClientId: '1376684488339357837', // Your Discord app client ID
+    discordClientId: '1376684488339357837', // Discord app client ID
     discordRedirectUri: 'http://localhost:8080', // Local testing on port 8080
     serverId: '1210396395643863101', // Your AO server ID
     apiBaseUrl: 'http://localhost:3001/api', // backend
@@ -319,18 +319,16 @@ function showWalletInfo(address) {
 
 function showRewardSuccess(reward) {
     rewardSection.style.display = 'block';
-    
-    const confirmationStatus = reward.confirmed 
-        ? '✅ Confirmed on AO Network' 
-        : '⏳ Transfer sent, awaiting confirmation';
+
+    // Shorten the recipient address to first 4 and last 4 characters
+    const shortAddr = `${reward.recipient.substring(0, 4)}...${reward.recipient.substring(reward.recipient.length - 4)}`;
     
     document.getElementById('rewardInfo').innerHTML = `
         <strong>Role:</strong> ${reward.roleName || 'N/A'}<br>
         <strong>Asset:</strong> ${reward.amount} ${reward.token}<br>
         <strong>Transaction ID:</strong> <a href="https://www.ao.link/#/message/${reward.txId}" target="_blank">${reward.txId.substring(0, 12)}...</a><br>
-        <strong>Recipient:</strong> ${reward.recipient}<br>
-        <strong>Status:</strong> ${confirmationStatus}<br>
-        <strong>Asset Process:</strong> <a href="https://www.ao.link/#/token/${reward.assetId}" target="_blank">${reward.assetId.substring(0, 12)}...</a>
+        <strong>Recipient:</strong> <a href="https://bazar.arweave.net/#/profile/${reward.recipient}" target="_blank">${shortAddr}</a><br>
+        <strong>Asset on Bazar:</strong> <a href="https://bazar.arweave.net/#/asset/${reward.assetId}" target="_blank">${reward.assetId.substring(0, 12)}...</a>
     `;
 }
 
@@ -343,13 +341,12 @@ function showAlreadyClaimedInfo(result) {
     
     const claimedInfoHtml = `
         <div style="margin-top: 1rem; padding: 1.5rem; background: linear-gradient(135deg, #2a1a1a, #1a1a2a); border-radius: 8px; border: 1px solid #ff6b35;">
-            <h4 style="color: #ff6b35; margin-bottom: 1rem; text-align: center;">🎯 Reward Already Claimed</h4>
+            <h4 style="color: #ff6b35; margin-bottom: 1rem; text-align: center;">❗️Reward Already Claimed</h4>
             <div style="text-align: left; color: #ccc;">
                 <p><strong>Role:</strong> ${roleName}</p>
                 <p><strong>Reward:</strong> ${amount} ${tokenDisplayName}</p>
                 ${result.claimDate ? `<p><strong>Claimed:</strong> ${new Date(result.claimDate).toLocaleDateString()}</p>` : ''}
                 ${result.transactionId ? `<p><strong>Transaction:</strong> <a href="https://www.ao.link/#/message/${result.transactionId}" target="_blank" style="color: #5865f2;">${result.transactionId.substring(0, 12)}...${result.transactionId.substring(result.transactionId.length - 8)}</a></p>` : ''}
-                <p><strong>Status:</strong> ${result.rewardDetails.status || 'Confirmed'}</p>
             </div>
             <div style="text-align: center; margin-top: 1rem; padding: 1rem; background: rgba(255, 107, 53, 0.1); border-radius: 6px;">
                 <p style="font-size: 0.9rem; color: #ff6b35; margin: 0;">
@@ -382,7 +379,7 @@ function showBazarProfileHelp() {
             
             <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 107, 53, 0.1); border-radius: 6px; border-left: 4px solid #ff6b35;">
                 <p style="font-size: 0.9rem; color: #ff6b35; margin: 0;">
-                    <strong>⚠️ Important:</strong> Your Bazar profile must be created with the same wallet address you're using here. Once created, it should be automatically detected.
+                    <strong>⚠️ Important:</strong> Your Bazar profile must be created with the same wallet address you use here. Once created, it should be automatically detected.
                 </p>
             </div>
         </div>
