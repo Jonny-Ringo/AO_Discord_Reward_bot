@@ -169,7 +169,6 @@ db.serialize(() => {
             tx_id TEXT NOT NULL,
             amount TEXT NOT NULL,
             token TEXT NOT NULL,
-            status TEXT DEFAULT 'pending',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             confirmed_at DATETIME,
             UNIQUE(discord_user_id, role_id)
@@ -213,20 +212,6 @@ function saveRewardRecord(data) {
             function(err) {
                 if (err) reject(err);
                 else resolve(this.lastID);
-            }
-        );
-    });
-}
-
-function updateRewardStatus(txId, status) {
-    return new Promise((resolve, reject) => {
-        const confirmedAt = status === 'confirmed' ? new Date().toISOString() : null;
-        db.run(
-            `UPDATE rewards SET status = ?, confirmed_at = ? WHERE tx_id = ?`,
-            [status, confirmedAt, txId],
-            function(err) {
-                if (err) reject(err);
-                else resolve(this.changes);
             }
         );
     });
@@ -538,8 +523,7 @@ app.post('/api/verify-and-reward', async (req, res) => {
                     roleName: rewardConfig.name,           
                     token: rewardConfig.token,              
                     tokenDisplayName: rewardConfig.tokenDisplayName, 
-                    amount: rewardConfig.amount,           
-                    status: existingReward.status || 'confirmed'
+                    amount: rewardConfig.amount
                 }
             });
         }
