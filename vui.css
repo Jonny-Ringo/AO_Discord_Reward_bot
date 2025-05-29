@@ -30,7 +30,6 @@
         .logo {
             width: 60px;
             height: 60px;
-            background: linear-gradient(135deg, #5865f2, #404eed);
             border-radius: 50%;
             margin: 0 auto 1.5rem;
             display: flex;
@@ -38,6 +37,13 @@
             justify-content: center;
             font-size: 24px;
             font-weight: bold;
+        }
+
+        .logo img {
+            width: 75px;  /* Adjust size as needed */
+            height: auto;
+            display: block;
+            margin: 0 auto;
         }
 
         h1 {
